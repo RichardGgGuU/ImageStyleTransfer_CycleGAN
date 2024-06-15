@@ -24,7 +24,7 @@ def test(img_path):
     # 实例化网络
     Gb = Cycle_Gan_G().to('cuda')
     # 加载预训练权重
-    ckpt = torch.load('weights/cycle_monent2photo.pth')
+    ckpt = torch.load('weights/cycle_monet2photo.pth')
     Gb.load_state_dict(ckpt['Gb_model'], strict=False)
 
     Gb.eval()
@@ -37,4 +37,4 @@ def test(img_path):
 
 
 if __name__ == '__main__':
-    test('123.jpg')
+    test('testphoto/test2.jpg')

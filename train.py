@@ -27,9 +27,9 @@ def train(opt):
     train_datasets = CreateDatasets(data_path, img_size, mode='train')
     val_datasets = CreateDatasets(data_path, img_size, mode='test')
 
-    train_loader = DataLoader(dataset=train_datasets, batch_size=batch, shuffle=True, num_workers=opt.numworker,
+    train_loader = DataLoader(dataset=train_datasets, batch_size=batch, shuffle=False, num_workers=opt.numworker,
                               drop_last=True)
-    val_loader = DataLoader(dataset=val_datasets, batch_size=batch, shuffle=True, num_workers=opt.numworker,
+    val_loader = DataLoader(dataset=val_datasets, batch_size=batch, shuffle=False, num_workers=opt.numworker,
                             drop_last=True)
 
     # 实例化网络
@@ -49,6 +49,7 @@ def train(opt):
     B_fake_pool = ImagePool(50)
 
     # 加载预训练权重
+    """
     if opt.weight != '':
         ckpt = torch.load(opt.weight)
         Cycle_G_A.load_state_dict(ckpt['Ga_model'], strict=False)
@@ -56,6 +57,40 @@ def train(opt):
         Cycle_D_A.load_state_dict(ckpt['Da_model'], strict=False)
         Cycle_D_B.load_state_dict(ckpt['Db_model'], strict=False)
         start_epoch = ckpt['epoch'] + 1
+    """
+    if opt.weight != '':
+        ckpt = torch.load(opt.weight)
+
+        # 打印检查点文件的键，确认键值
+        print("Keys in checkpoint file:", ckpt.keys())
+
+        # 获取模型的状态字典
+        cycle_g_a_state_dict = Cycle_G_A.state_dict()
+        cycle_g_b_state_dict = Cycle_G_B.state_dict()
+        cycle_d_a_state_dict = Cycle_D_A.state_dict()
+        cycle_d_b_state_dict = Cycle_D_B.state_dict()
+
+        # 加载检查点文件中的权重到模型中
+        cycle_g_a_pretrained_dict = {k: v for k, v in ckpt.items() if k in cycle_g_a_state_dict}
+        cycle_g_b_pretrained_dict = {k: v for k, v in ckpt.items() if k in cycle_g_b_state_dict}
+        cycle_d_a_pretrained_dict = {k: v for k, v in ckpt.items() if k in cycle_d_a_state_dict}
+        cycle_d_b_pretrained_dict = {k: v for k, v in ckpt.items() if k in cycle_d_b_state_dict}
+
+        cycle_g_a_state_dict.update(cycle_g_a_pretrained_dict)
+        cycle_g_b_state_dict.update(cycle_g_b_pretrained_dict)
+        cycle_d_a_state_dict.update(cycle_d_a_pretrained_dict)
+        cycle_d_b_state_dict.update(cycle_d_b_pretrained_dict)
+
+        Cycle_G_A.load_state_dict(cycle_g_a_state_dict, strict=False)
+        Cycle_G_B.load_state_dict(cycle_g_b_state_dict, strict=False)
+        Cycle_D_A.load_state_dict(cycle_d_a_state_dict, strict=False)
+        Cycle_D_B.load_state_dict(cycle_d_b_state_dict, strict=False)
+
+        # 如果检查点文件中包含 'epoch' 键，则更新开始的 epoch
+        if 'epoch' in ckpt:
+            start_epoch = ckpt['epoch'] + 1
+        else:
+            start_epoch = 0  # 如果检查点文件中不包含 'epoch' 键，则从0开始
 
     writer = SummaryWriter('train_logs')
     # 开始训练
@@ -78,7 +113,7 @@ def train(opt):
             'Da_model': Cycle_D_A.state_dict(),
             'Db_model': Cycle_D_B.state_dict(),
             'epoch': epoch
-        }, './weights/cycle_monent2photo.pth')
+        }, './weights/cycle_monet2photo.pth')
 
         # 验证集
         val(Ga=Cycle_G_A, Da=Cycle_D_A, Gb=Cycle_G_B, Db=Cycle_D_B, val_loader=val_loader, loss=loss, l1_loss=l1_loss,
@@ -91,8 +126,8 @@ def cfg():
     parse.add_argument('--batch', type=int, default=1)
     parse.add_argument('--epoch', type=int, default=100)
     parse.add_argument('--imgsize', type=int, default=256)
-    parse.add_argument('--dataPath', type=str, default='../monet2photo', help='data root path')
-    parse.add_argument('--weight', type=str, default='weights/cycle_monent2photo.pth', help='load pre train weight')
+    parse.add_argument('--dataPath', type=str, default='monet2photo/monet2photo', help='data root path')
+    parse.add_argument('--weight', type=str, default='weights/monet2photo.pth', help='load pre train weight')
     parse.add_argument('--savePath', type=str, default='./weights', help='weight save path')
     parse.add_argument('--numworker', type=int, default=4)
     parse.add_argument('--every', type=int, default=20, help='plot train result every * iters')
@@ -101,6 +136,7 @@ def cfg():
 
 
 if __name__ == '__main__':
+    os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
     opt = cfg()
     print(opt)
     train(opt)
